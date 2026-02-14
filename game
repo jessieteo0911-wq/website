@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>坐标争霸赛 (最终版)</title>
+    <style>
+        :root {
+            --grid-size: 15;
+            --cell-size: 40px;
+            --marker-size: 30px;
+            --board-size: calc(var(--grid-size) * var(--cell-size));
+        }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+            background-color: #f0f5f9;
+        }
+        .app-container { display: flex; align-items: flex-start; gap: 30px; }
+        #game-panel { display: flex; flex-direction: column; align-items: center; }
+        #board-wrapper {
+            position: relative;
+            width: var(--board-size);
+            height: var(--board-size);
+            background-color: #fdfaf2;
+            border: 2px solid #6b4e3d;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            margin: 30px;
+            background-image:
+                linear-gradient(to right, #e0dcd1 1px, transparent 1px),
+                linear-gradient(to bottom, #e0dcd1 1px, transparent 1px);
+            background-size: var(--cell-size) var(--cell-size);
+        }
+        #click-nodes-container {
+            position: absolute;
+            top: calc(var(--cell-size) / -2);
+            left: calc(var(--cell-size) / -2);
+            width: calc(var(--board-size) + var(--cell-size));
+            height: calc(var(--board-size) + var(--cell-size));
+            display: grid;
+            grid-template-columns: repeat(calc(var(--grid-size) + 1), 1fr);
+            grid-template-rows: repeat(calc(var(--grid-size) + 1), 1fr);
+            z-index: 10;
+        }
+        .click-node:hover { background-color: rgba(0,0,0,0.1); border-radius: 50%; }
+        .marker {
+            position: absolute;
+            width: var(--marker-size);
+            height: var(--marker-size);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+            z-index: 5;
+        }
+        .axis-label { position: absolute; font-size: 12px; color: #333; font-weight: bold; }
+        .x-axis-label { bottom: -25px; transform: translateX(-50%); }
+        .y-axis-label { left: -25px; transform: translateY(50%); }
+        .origin-label { transform: translate(-150%, 150%); }
+        
+        #rules-panel,
+        #control-panel { 
+            width: 280px; 
+            padding: 20px; 
+            margin-top: 52px;
+            background-color: #ffffff; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
+        }
+        
+        #turn-indicator { text-align: center; margin-bottom: 15px; }
+        #current-player-display { display: inline-block; padding: 10px 20px; border-radius: 5px; color: white; font-size: 1.2em; font-weight: bold; transition: background-color 0.3s; }
+        #input-area { display: flex; gap: 10px; margin-top: 10px; }
+        #coord-input-field { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; text-align: center; font-size: 1.2em; }
+        .control-btn { padding: 0 20px; border: none; cursor: pointer; border-radius: 5px; color: white;}
+        #coord-submit-btn { background-color: #4CAF50; }
+        #continue-btn { background-color: #3498DB; }
+        #coord-submit-btn:hover:not(:disabled) { background-color: #45a049; }
+        #continue-btn:hover:not(:disabled) { background-color: #2980b9; }
+        input:disabled, button:disabled { background-color: #ccc; cursor: not-allowed; }
+        #notification { min-height: 40px; margin-top: 10px; font-weight: bold; font-size: 0.9em; transition: color 0.5s; text-align: center; display: flex; align-items: center; justify-content: center;}
+        .correct { color: #2ECC71; }
+        .incorrect { color: #E74C3C; }
+        #scoreboard { margin-top: 10px; }
+        .score-entry { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 4px; margin-bottom: 5px; }
+        #reset-btn { width: 100%; padding: 10px; font-size: 16px; margin-top: 20px; cursor: pointer; border: none; border-radius: 5px; background-color: #f44336; color: white; }
+        #reset-btn:hover { background-color: #d32f2f; }
+        
+        #rules-header { display: flex; justify-content: space-between; align-items: center; }
+        #toggle-rules-btn { font-size: 0.7em; padding: 3px 8px; cursor: pointer; border: 1px solid #ccc; background: #f0f0f0; border-radius: 4px;}
+        #rules-box ul { padding-left: 0; margin: 0; list-style-type: none; }
+        #rules-box li { margin-bottom: 15px; line-height: 1.4;}
+        #rules-box strong { color: #0056b3; }
+
+        #music-player { margin-top: 20px; text-align: center; }
+        #music-player button { width: auto; padding: 5px 15px; font-size: 0.9em; }
+        #volume-control { width: 100px; margin-left: 10px; }
+        #lang-toggle-btn { width: 100%; padding: 8px; font-size: 0.9em; margin-top:20px; cursor: pointer; background-color: #6c757d; color:white; border:none; border-radius: 5px;}
+        #lang-toggle-btn:hover{ background-color: #5a6268; }
+
+        #victory-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        #victory-box { background-color: white; padding: 40px 60px; border-radius: 15px; text-align: center; animation: pop-in 0.5s ease-out; }
+        #victory-text { font-size: 2.5em; font-weight: bold; margin-bottom: 20px; }
+        @keyframes pop-in { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div id="rules-panel">
+            <div id="rules-header">
+                <h3 data-key="rulesTitle">游戏指南</h3>
+                <button id="toggle-rules-btn" data-key="toggleRulesBtn">切换风格</button>
+            </div>
+            <hr>
+            <div id="rules-box"></div>
+            <hr style="margin-top: 20px;">
+            <button id="lang-toggle-btn">Switch to English</button>
+             <div id="music-player">
+                <audio id="bg-music" loop></audio>
+                <button id="play-pause-btn" data-key="playMusicBtn">▶️ 播放音乐</button>
+                <input type="range" id="volume-control" min="0" max="1" step="0.1" value="0.3">
+            </div>
+            <button id="reset-btn" onclick="resetGame()" data-key="resetBtn">重新开始游戏</button>
+        </div>
+
+        <div id="game-panel">
+            <h1 style="margin: 0 0 10px 0;" data-key="mainTitle">坐标争霸赛</h1>
+            <div id="board-wrapper">
+                <div id="click-nodes-container"></div>
+            </div>
+        </div>
+
+        <div id="control-panel">
+            <div id="turn-indicator">
+                <h2 data-key="currentPlayerTitle">当前回合</h2>
+                <div id="current-player-display"></div>
+            </div>
+            <hr>
+            <h4 data-key="actionAreaTitle">操作区</h4>
+            <div id="input-area">
+                <input type="text" id="coord-input-field">
+                <button id="coord-submit-btn" class="control-btn" data-key="submitBtn">确定</button>
+                <button id="continue-btn" class="control-btn hidden" data-key="continueBtn">下一组</button>
+            </div>
+            <div id="notification"></div>
+            <hr>
+            <h3 data-key="teamListTitle">队伍列表</h3>
+            <div id="scoreboard"></div>
+        </div>
+    </div>
+
+    <div id="victory-overlay"><div id="victory-box"><div id="victory-text"></div><button onclick="resetGame()" data-key="playAgainBtn">再玩一局!</button></div></div>
+    
+    <audio id="victory-sound" src="https://cdn.pixabay.com/download/audio/2022/11/22/audio_2c5a8a9233.mp3" preload="auto"></audio>
+    <audio id="correct-sound" src="https://cdn.pixabay.com/download/audio/2022/03/10/audio_c3b165b30f.mp3" preload="auto"></audio>
+    <audio id="incorrect-sound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_16b84a9562.mp3" preload="auto"></audio>
+
+    <script>
+        // JavaScript代码与上一版完全相同，因为只修改了HTML结构
+        const GRID_SIZE = 15;
+        const TEAMS = [ { name: '第 1 组', color: '#E74C3C', symbol: '🔴' }, { name: '第 2 组', color: '#3498DB', symbol: '🔵' }, { name: '第 3 组', color: '#2ECC71', symbol: '🟢' }, { name: '第 4 组', color: '#F1C40F', symbol: '🟡' }, { name: '第 5 组', color: '#9B59B6', symbol: '🟣' }, { name: '第 6 组', color: '#E67E22', symbol: '🟠' }];
+        const translations = {
+            zh: {
+                mainTitle: "坐标争霸赛", rulesTitle: "游戏指南", toggleRulesBtn: "切换风格",
+                rulesSimple: `<ul><li>点击棋盘落子。</li><li>正确输入该点坐标 (x,y)。</li><li>先将4个棋子连成一线者（横/竖/斜）获胜！</li></ul>`,
+                rulesVivid: `<ul><li><strong>第一步：抢占先机！</strong><br>轮到你们组时，在棋盘上选择一个关键的交叉点，放下你们的临时标记。</li><li><strong>第二步：报出暗号！</strong><br>在操作区准确输入坐标(x,y)。记住口诀：“先走横，再爬高”！</li><li><strong>第三步：夺取胜利！</strong><br>最先将四个棋子连成一条直线的队伍，就是最终的“坐标霸主”！</li></ul>`,
+                currentPlayerTitle: "当前回合", actionAreaTitle: "操作区", submitBtn: "确定", continueBtn: "下一组",
+                teamListTitle: "队伍列表", playMusicBtn: "▶️ 播放音乐", pauseMusicBtn: "⏸️ 暂停音乐",
+                resetBtn: "重新开始游戏", playAgainBtn: "再玩一局!", teamLabel: "第 ", groupLabel: " 组",
+                inputPlaceholderDefault: "等待点击棋盘...", inputPlaceholderActive: "格式: x,y",
+                notifCorrect: "回答正确！",
+                notifIncorrectDefault: (x, y) => `回答错误！正确坐标是 (${x},${y})`,
+                notifIncorrectOrder: (x, y) => `回答错误！<strong>请注意X轴和Y轴的顺序哦。</strong>正确坐标是 (${x},${y})`,
+                notifIncorrectX: (x, y) => `回答错误！<strong>Y轴坐标答对了，但X轴错了。</strong>正确坐标是 (${x},${y})`,
+                notifIncorrectY: (x, y) => `回答错误！<strong>X轴坐标答对了，但Y轴错了。</strong>正确坐标是 (${x},${y})`,
+                victoryText: (teamName) => `🎉 恭喜 ${teamName} 获胜! 🎉`, langToggle: "Switch to English"
+            },
+            en: {
+                mainTitle: "Coordinate Championship", rulesTitle: "Game Guide", toggleRulesBtn: "Toggle Style",
+                rulesSimple: `<ul><li>Click the board to place a piece.</li><li>Enter the correct coordinate (x,y).</li><li>The first team to connect 4 pieces in a line (horizontal/vertical/diagonal) wins!</li></ul>`,
+                rulesVivid: `<ul><li><strong>Step 1: Take the Lead!</strong><br>On your turn, click a key intersection on the board to place your temporary marker.</li><li><strong>Step 2: State the Code!</strong><br>In the action area, enter the coordinate (x,y). Remember the rule: "Walk across, then climb up" (X then Y)!</li><li><strong>Step 3: Seize Victory!</strong><br>The first team to connect four pieces in a straight line becomes the ultimate 'Coordinate Champion'!</li></ul>`,
+                currentPlayerTitle: "Current Turn", actionAreaTitle: "Action Area", submitBtn: "Confirm", continueBtn: "Next Team",
+                teamListTitle: "Team List", playMusicBtn: "▶️ Play Music", pauseMusicBtn: "⏸️ Pause Music",
+                resetBtn: "Reset Game", playAgainBtn: "Play Again!", teamLabel: "Group ", groupLabel: "",
+                inputPlaceholderDefault: "Waiting for a click on the board...", inputPlaceholderActive: "Format: x,y",
+                notifCorrect: "Correct Answer!",
+                notifIncorrectDefault: (x, y) => `Incorrect! The correct coordinate is (${x},${y})`,
+                notifIncorrectOrder: (x, y) => `Incorrect! <strong>Mind the order of X and Y.</strong> The correct coordinate is (${x},${y})`,
+                notifIncorrectX: (x, y) => `Incorrect! <strong>The Y-coordinate is right, but X is wrong.</strong> The correct coordinate is (${x},${y})`,
+                notifIncorrectY: (x, y) => `Incorrect! <strong>The X-coordinate is right, but Y is wrong.</strong> The correct coordinate is (${x},${y})`,
+                victoryText: (teamName) => `🎉 Congratulations, ${teamName}, you win! 🎉`, langToggle: "切换至中文"
+            }
+        };
+        let currentLang = 'zh';
+        const MUSIC_SRC = 'https://cdn.pixabay.com/download/audio/2022/08/04/audio_2d02518e72.mp3';
+        let currentRule = 'vivid';
+        let currentPlayerIndex = 0, gameBoardState, gameOver = false, pendingMove = null;
+        const boardWrapper = document.getElementById('board-wrapper'), clickNodesContainer = document.getElementById('click-nodes-container'), scoresContainer = document.getElementById('scoreboard'), playerDisplay = document.getElementById('current-player-display'), victoryOverlay = document.getElementById('victory-overlay'), victoryText = document.getElementById('victory-text'), victorySound = document.getElementById('victory-sound'), correctSound = document.getElementById('correct-sound'), incorrectSound = document.getElementById('incorrect-sound'), coordInputField = document.getElementById('coord-input-field'), coordSubmitBtn = document.getElementById('coord-submit-btn'), continueBtn = document.getElementById('continue-btn'), notification = document.getElementById('notification'), rulesBox = document.getElementById('rules-box'), toggleRulesBtn = document.getElementById('toggle-rules-btn'), bgMusic = document.getElementById('bg-music'), playPauseBtn = document.getElementById('play-pause-btn'), volumeControl = document.getElementById('volume-control'), langToggleBtn = document.getElementById('lang-toggle-btn');
+        function translatePage() { document.querySelectorAll('[data-key]').forEach(el => { el.textContent = translations[currentLang][el.dataset.key]; }); updateTeamList(currentLang); updateRules(); setInteractivity(false, false); updateTurnIndicator(); }
+        function toggleLang() { currentLang = (currentLang === 'zh') ? 'en' : 'zh'; langToggleBtn.textContent = translations[currentLang].langToggle; translatePage(); }
+        function updateRules() { rulesBox.innerHTML = (currentRule === 'vivid') ? translations[currentLang].rulesVivid : translations[currentLang].rulesSimple; }
+        function toggleRules() { currentRule = (currentRule === 'vivid') ? 'simple' : 'vivid'; updateRules(); }
+        function createGrid() { for (let y = 0; y <= GRID_SIZE; y++) { for (let x = 0; x <= GRID_SIZE; x++) { const n = document.createElement('div'); n.classList.add('click-node'); n.dataset.x = x; n.dataset.y = y; n.addEventListener('click', handleNodeClick); clickNodesContainer.appendChild(n); } } const o = document.createElement('div'); o.classList.add('axis-label', 'origin-label'); o.textContent = '0'; o.style.left = '0%'; o.style.bottom = '0%'; boardWrapper.appendChild(o); for (let i = 1; i <= GRID_SIZE; i++) { const x = document.createElement('div'); x.classList.add('axis-label', 'x-axis-label'); x.textContent = i; x.style.left = `calc(${(i/GRID_SIZE)*100}%)`; boardWrapper.appendChild(x); const y = document.createElement('div'); y.classList.add('axis-label', 'y-axis-label'); y.textContent = i; y.style.bottom = `calc(${(i/GRID_SIZE)*100}%)`; boardWrapper.appendChild(y); } }
+        function handleNodeClick(event) { if (gameOver || pendingMove) return; const node = event.currentTarget; const x_idx = parseInt(node.dataset.x), y_idx = parseInt(node.dataset.y); if (gameBoardState[y_idx][x_idx] !== null) return; const tempMarker = placeMarker(x_idx, y_idx, true); pendingMove = { x_idx, y_idx, x_math: x_idx, y_math: GRID_SIZE - y_idx, markerElement: tempMarker }; setInteractivity(true); }
+        function submitCoordinate() { if (!pendingMove) return; const { x_idx, y_idx, x_math, y_math, markerElement } = pendingMove; const userInput = coordInputField.value.replace(/\s/g, ''); const expectedInput = `${x_math},${y_math}`; const parsedInput = userInput.split(','); if (userInput === expectedInput) { correctSound.currentTime = 0; correctSound.play(); showNotification(translations[currentLang].notifCorrect, 'correct'); markerElement.style.opacity = '1'; gameBoardState[y_idx][x_idx] = currentPlayerIndex; if (checkForWin(x_idx, y_idx)) { gameOver = true; showVictoryScreen(TEAMS[currentPlayerIndex]); } else { switchPlayer(); } pendingMove = null; setInteractivity(false); } else { incorrectSound.currentTime = 0; incorrectSound.play(); let errorMessage = translations[currentLang].notifIncorrectDefault(x_math, y_math); if (parsedInput.length === 2) { const inputX = parseInt(parsedInput[0]), inputY = parseInt(parsedInput[1]); if (inputX === y_math && inputY === x_math) { errorMessage = translations[currentLang].notifIncorrectOrder(x_math, y_math); } else if (inputX !== x_math && inputY === y_math) { errorMessage = translations[currentLang].notifIncorrectX(x_math, y_math); } else if (inputX === x_math && inputY !== y_math) { errorMessage = translations[currentLang].notifIncorrectY(x_math, y_math); } } showNotification(errorMessage, 'incorrect'); pauseForExplanation(); } }
+        function pauseForExplanation() { setInteractivity(false, true); }
+        function proceedToNextTurn() { if (pendingMove) { pendingMove.markerElement.remove(); pendingMove = null; } showNotification('', ''); switchPlayer(); setInteractivity(false, false); }
+        function setInteractivity(active, paused = false) { coordInputField.disabled = !active || paused; if (active && !paused) { coordSubmitBtn.classList.remove('hidden'); continueBtn.classList.add('hidden'); coordInputField.placeholder = translations[currentLang].inputPlaceholderActive; coordInputField.focus(); } else if (paused) { coordSubmitBtn.classList.add('hidden'); continueBtn.classList.remove('hidden'); } else { coordSubmitBtn.classList.remove('hidden'); continueBtn.classList.add('hidden'); coordInputField.value = ''; coordInputField.placeholder = translations[currentLang].inputPlaceholderDefault; } }
+        function showNotification(message, type) { notification.innerHTML = message; notification.className = type; if (type === 'correct') { setTimeout(() => { if(!pendingMove) {notification.innerHTML = ''; notification.className = ''} }, 2000); } }
+        function placeMarker(x_idx, y_idx, isTemporary = false) { const m = document.createElement('div'); m.classList.add('marker'); m.style.backgroundColor = TEAMS[currentPlayerIndex].color; m.style.left = `${(x_idx/GRID_SIZE)*100}%`; m.style.top = `${(y_idx/GRID_SIZE)*100}%`; if(isTemporary) m.style.opacity = '0.6'; boardWrapper.appendChild(m); return m; }
+        function switchPlayer() { currentPlayerIndex = (currentPlayerIndex + 1) % TEAMS.length; updateTurnIndicator(); }
+        function checkForWin(x, y) { const p = currentPlayerIndex, d = [{x:1,y:0},{x:0,y:1},{x:1,y:1},{x:1,y:-1}]; for (const dir of d) { let c=1; for(let i=1;i<4;i++){const nX=x+i*dir.x,nY=y+i*dir.y;if(nX>=0&&nX<=GRID_SIZE&&nY>=0&&nY<=GRID_SIZE&&gameBoardState[nY][nX]===p)c++;else break;} for(let i=1;i<4;i++){const nX=x-i*dir.x,nY=y-i*dir.y;if(nX>=0&&nX<=GRID_SIZE&&nY>=0&&nY<=GRID_SIZE&&gameBoardState[nY][nX]===p)c++;else break;} if(c>=4)return true;} return false; }
+        function showVictoryScreen(team) { const teamName = (currentLang === 'zh') ? team.name : `${translations.en.teamLabel}${TEAMS.indexOf(team) + 1}`; victoryText.textContent = translations[currentLang].victoryText(teamName); victoryText.style.color = team.color; victoryOverlay.style.display = 'flex'; victorySound.play(); }
+        function updateTurnIndicator() { const p = TEAMS[currentPlayerIndex]; const teamName = (currentLang === 'zh') ? p.name : `${translations.en.teamLabel}${TEAMS.indexOf(p) + 1}`; playerDisplay.textContent = teamName; playerDisplay.style.backgroundColor = p.color; }
+        function updateTeamList() { scoresContainer.innerHTML = ''; TEAMS.forEach((t, i) => { const e = document.createElement('div'); e.classList.add('score-entry'); e.style.backgroundColor = `${t.color}33`; const teamName = (currentLang === 'zh') ? t.name : `${translations.en.teamLabel}${i + 1}`; e.innerHTML = `<span style="font-size:1.2em;">${t.symbol}</span><strong>${teamName}</strong>`; scoresContainer.appendChild(e); }); }
+        
+        function resetGame() {
+            gameOver = false;
+            if (pendingMove) { pendingMove.markerElement.remove(); pendingMove = null; }
+            setInteractivity(false);
+            currentPlayerIndex = 0; // 默认第一组开始
+            boardWrapper.querySelectorAll('.marker').forEach(m => m.remove());
+            victoryOverlay.style.display = 'none';
+            gameBoardState = Array(GRID_SIZE + 1).fill(null).map(() => Array(GRID_SIZE + 1).fill(null));
+            showNotification('','');
+            updateTurnIndicator();
+        }
+
+        function initGame() {
+            boardWrapper.querySelectorAll('.axis-label').forEach(e => e.remove());
+            clickNodesContainer.innerHTML = '';
+            createGrid(); 
+            updateTeamList(); 
+            resetGame();
+            updateRules();
+            langToggleBtn.addEventListener('click', toggleLang);
+            toggleRulesBtn.addEventListener('click', toggleRules);
+            coordSubmitBtn.addEventListener('click', submitCoordinate);
+            continueBtn.addEventListener('click', proceedToNextTurn);
+            coordInputField.addEventListener('keyup', e => { if (e.key === 'Enter') { if (!continueBtn.classList.contains('hidden')) { proceedToNextTurn(); } else { submitCoordinate(); } } });
+            playPauseBtn.addEventListener('click', () => { if(bgMusic.paused) { bgMusic.play(); playPauseBtn.textContent = translations[currentLang].pauseMusicBtn; } else { bgMusic.pause(); playPauseBtn.textContent = translations[currentLang].playMusicBtn; } });
+            volumeControl.addEventListener('input', (e) => { bgMusic.volume = e.target.value; });
+        }
+        
+        bgMusic.src = MUSIC_SRC;
+        bgMusic.volume = volumeControl.value;
+        initGame();
+        translatePage();
+    </script>
+</body>
+</html>
